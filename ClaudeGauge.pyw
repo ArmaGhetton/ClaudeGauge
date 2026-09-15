@@ -98,6 +98,26 @@ THEMES = {
         "border": "#DEDAD2",
         "hover": "#ECE9E2",
     },
+    "aurora": {
+        "bg": "#15131C",
+        "card": "#1E1B29",
+        "track": "#3A3550",
+        "text": "#F2F0EA",
+        "muted": "#9791A8",
+        "border": "#2C2839",
+        "hover": "#282438",
+        "gradient": ("#7C5CFC", "#2FD1C5"),
+    },
+    "sunset": {
+        "bg": "#1F1512",
+        "card": "#2A1C17",
+        "track": "#4A2E22",
+        "text": "#F5ECE6",
+        "muted": "#B08A78",
+        "border": "#3A2620",
+        "hover": "#33211B",
+        "gradient": ("#FF7A59", "#FFC24B"),
+    },
 }
 
 ACCENTS = {
@@ -112,6 +132,35 @@ ACCENTS = {
 COLOR_WARN = "#E0A33B"
 COLOR_DANGER = "#E05B4C"
 
+# Цвет-ключ для эффекта стекла: -transparentcolor делает пиксели этого
+# цвета полностью прозрачными и пропускает блюр Windows позади окна.
+# Кислотная магента — ни одна тема так не красит, коллизий не будет,
+# а если где-то протечёт по ошибке, будет сразу заметно.
+GLASS_KEY_COLOR = "#FF00FE"
+
+
+def lerp_color(color1, color2, t):
+    """Промежуточный HEX-цвет между color1 и color2, t от 0 до 1."""
+    t = max(0.0, min(1.0, t))
+    r1, g1, b1 = int(color1[1:3], 16), int(color1[3:5], 16), int(color1[5:7], 16)
+    r2, g2, b2 = int(color2[1:3], 16), int(color2[3:5], 16), int(color2[5:7], 16)
+    return "#%02X%02X%02X" % (round(r1 + (r2 - r1) * t),
+                              round(g1 + (g2 - g1) * t),
+                              round(b1 + (b2 - b1) * t))
+
+
+def draw_horizontal_gradient(canvas, width, height, color1, color2):
+    """Заливает canvas слева направо градиентом тонкими полосками."""
+    canvas.delete("all")
+    width = max(1, int(width))
+    step = 2
+    x = 0
+    while x < width:
+        seg_end = min(width, x + step)
+        color = lerp_color(color1, color2, (x + seg_end) / 2.0 / width)
+        canvas.create_rectangle(x, 0, seg_end, height, fill=color, outline=color)
+        x = seg_end
+
 
 DEFAULT_SETTINGS = {
     "opacity": 94,               # 30..100
@@ -122,6 +171,7 @@ DEFAULT_SETTINGS = {
     "stay_above_fullscreen": False,
     "hide_from_taskbar": True,
     "compact": False,
+    "glass": False,
     "show_model_limits": True,
     "show_extra_usage": True,
     "refresh_seconds": DEFAULT_REFRESH_SECONDS,
@@ -525,13 +575,33 @@ class ProgressBar(tk.Canvas):
         self.create_oval(x2 - h, 0, x2, h, fill=color, outline=color)
         self.create_rectangle(x1 + h / 2, 0, x2 - h / 2, h, fill=color, outline=color)
 
-    def render(self, percent, color):
+    def _pill_gradient(self, x1, x2, colors):
+        h = self.bar_height
+        if x2 - x1 < h:
+            x2 = x1 + h
+        total = self.bar_width
+        step = 2
+        x = x1
+        while x < x2:
+            seg_end = min(x2, x + step)
+            color = lerp_color(colors[0], colors[1], (x + seg_end) / 2.0 / total)
+            self.create_rectangle(x, 0, seg_end, h, fill=color, outline=color)
+            x = seg_end
+        left_color = lerp_color(colors[0], colors[1], x1 / total)
+        right_color = lerp_color(colors[0], colors[1], x2 / total)
+        self.create_oval(x1, 0, x1 + h, h, fill=left_color, outline=left_color)
+        self.create_oval(x2 - h, 0, x2, h, fill=right_color, outline=right_color)
+
+    def render(self, percent, color, gradient=None):
         self.delete("all")
         self._pill(0, self.bar_width, self.theme["track"])
         percent = max(0.0, min(100.0, float(percent)))
         if percent > 0:
             filled = max(self.bar_height, self.bar_width * percent / 100.0)
-            self._pill(0, filled, color)
+            if gradient:
+                self._pill_gradient(0, filled, gradient)
+            else:
+                self._pill(0, filled, color)
 
 
 class UsageRow:
@@ -580,13 +650,20 @@ class UsageRow:
             return COLOR_WARN
         return self.app.settings["accent"]
 
+    def gradient_for(self, color):
+        """Градиент темы применяется только к обычному цвету полосы,
+        не к жёлтому/красному предупреждению."""
+        if color != self.app.settings["accent"]:
+            return None
+        return self.app.theme.get("gradient")
+
     def update(self, percent, reset_at, prefix="Сброс"):
         self.percent = float(percent or 0.0)
         self.reset_at = reset_at
         self.prefix = prefix
-        self.value_label.config(text="%.0f%%" % self.percent,
-                                fg=self.color_for(self.percent))
-        self.bar.render(self.percent, self.color_for(self.percent))
+        color = self.color_for(self.percent)
+        self.value_label.config(text="%.0f%%" % self.percent, fg=color)
+        self.bar.render(self.percent, color, gradient=self.gradient_for(color))
         if reset_at is None:
             self.sub_label.config(text="Нет активного окна.")
         else:
@@ -628,7 +705,9 @@ class SettingsWindow(tk.Toplevel):
         self.protocol("WM_DELETE_WINDOW", self.close)
         app.apply_icon(self)
 
-        theme = app.theme
+        # Настоящие цвета темы, без подмены "card" на ключ прозрачности
+        # для эффекта стекла — у окна настроек своя обычная рамка.
+        theme = THEMES.get(app.settings.get("theme", "dark"), THEMES["dark"])
         self._chrome_theme = theme
         label_font = ("Segoe UI", 9)
         head_font = ("Segoe UI Semibold", 10)
@@ -708,7 +787,8 @@ class SettingsWindow(tk.Toplevel):
         tk.Label(frame, text="Тема", bg=theme["bg"], fg=theme["muted"],
                  font=label_font, width=16, anchor="n").pack(side="left", anchor="n")
         self.theme_var = tk.StringVar(value=self.settings["theme"])
-        for value, caption in (("dark", "Тёмная"), ("oled", "OLED"), ("light", "Светлая")):
+        for value, caption in (("dark", "Тёмная"), ("oled", "OLED"), ("light", "Светлая"),
+                               ("aurora", "Аврора"), ("sunset", "Закат")):
             self._build_theme_card(frame, value, caption).pack(side="left", padx=(0, 10))
 
         frame = row()
@@ -723,6 +803,7 @@ class SettingsWindow(tk.Toplevel):
         check(row(), "Скрывать с панели задач", "hide_from_taskbar",
               self.app.apply_window_styles)
         check(row(), "Компактный режим", "compact", self.app.rebuild)
+        check(row(), "Эффект стекла (блюр Windows)", "glass", self.app.rebuild)
         check(row(), "Закрепить позицию (не перетаскивается)", "locked")
 
         # --- Данные ---
@@ -865,10 +946,21 @@ class SettingsWindow(tk.Toplevel):
                            capstyle="round")
         canvas.create_line(15, 21, w - 34, 21, fill=colors["text"], width=2,
                            capstyle="round")
-        # мини-полоса прогресса текущим акцентом
+        # мини-полоса прогресса текущим акцентом (или градиентом темы)
         self._round_rect(canvas, 10, 33, w - 10, 39, 2, fill=colors["track"], outline="")
-        self._round_rect(canvas, 10, 33, 10 + (w - 20) * 0.55, 39, 2,
-                         fill=self.settings["accent"], outline="")
+        fill_x2 = 10 + (w - 20) * 0.55
+        gradient = colors.get("gradient")
+        if gradient:
+            x = 10
+            while x < fill_x2:
+                seg_end = min(fill_x2, x + 3)
+                t = (x + seg_end - 20) / 2.0 / (w - 20)
+                color = lerp_color(gradient[0], gradient[1], t)
+                canvas.create_rectangle(x, 33, seg_end, 39, fill=color, outline=color)
+                x = seg_end
+        else:
+            self._round_rect(canvas, 10, 33, fill_x2, 39, 2,
+                             fill=self.settings["accent"], outline="")
         label.config(fg=theme["text"] if selected else theme["muted"])
 
     def _repaint_theme_cards(self):
@@ -1100,6 +1192,8 @@ class Widget(tk.Tk):
         self.overrideredirect(True)
         self.configure(bg=self.theme["bg"])
 
+        self._glass_active = False
+        self.apply_glass()
         self.build()
         self.place_window()
         self.apply_icon()
@@ -1119,7 +1213,11 @@ class Widget(tk.Tk):
 
     @property
     def theme(self):
-        return THEMES.get(self.settings.get("theme", "dark"), THEMES["dark"])
+        base = THEMES.get(self.settings.get("theme", "dark"), THEMES["dark"])
+        if self.settings.get("glass") and getattr(self, "_glass_active", False):
+            base = dict(base)
+            base["card"] = GLASS_KEY_COLOR
+        return base
 
     def px(self, value):
         return max(1, int(round(value * self.settings.get("scale", 100) / 100.0)))
@@ -1177,6 +1275,76 @@ class Widget(tk.Tk):
             self.attributes("-alpha", self.settings.get("opacity", 94) / 100.0)
         except tk.TclError:
             pass
+
+    def apply_glass(self):
+        """Эффект стекла: -transparentcolor делает "card" дырой в окне,
+        а блюр Windows позади заполняет её. Если что-то пошло не так —
+        просто остаёмся без эффекта, ничего не ломаем."""
+        wanted = bool(self.settings.get("glass")) and sys.platform == "win32"
+        if wanted:
+            try:
+                self.attributes("-transparentcolor", GLASS_KEY_COLOR)
+            except tk.TclError:
+                wanted = False
+        if wanted:
+            self._glass_active = self.set_blur_behind(True)
+        else:
+            self.set_blur_behind(False)
+            self._glass_active = False
+            if sys.platform == "win32":
+                try:
+                    self.attributes("-transparentcolor", "")
+                except tk.TclError:
+                    pass
+
+    def set_blur_behind(self, on):
+        """Включает/выключает акриловый блюр окна через недокументированный
+        SetWindowCompositionAttribute. Может перестать работать в будущих
+        сборках Windows — тогда просто тихо не сработает."""
+        if sys.platform != "win32":
+            return False
+        try:
+            import ctypes
+
+            class AccentPolicy(ctypes.Structure):
+                _fields_ = [
+                    ("AccentState", ctypes.c_int),
+                    ("AccentFlags", ctypes.c_int),
+                    ("GradientColor", ctypes.c_uint),
+                    ("AnimationId", ctypes.c_int),
+                ]
+
+            class WindowCompositionAttributeData(ctypes.Structure):
+                _fields_ = [
+                    ("Attribute", ctypes.c_int),
+                    ("Data", ctypes.POINTER(AccentPolicy)),
+                    ("SizeOfData", ctypes.c_size_t),
+                ]
+
+            ACCENT_ENABLE_ACRYLICBLURBEHIND = 4
+            ACCENT_DISABLED = 0
+            WCA_ACCENT_POLICY = 19
+
+            tint = "#FFFFFF" if self.settings.get("theme") == "light" else "#000000"
+            r, g, b = int(tint[1:3], 16), int(tint[3:5], 16), int(tint[5:7], 16)
+            gradient_color = (0x33 << 24) | (b << 16) | (g << 8) | r
+
+            policy = AccentPolicy()
+            policy.AccentState = ACCENT_ENABLE_ACRYLICBLURBEHIND if on else ACCENT_DISABLED
+            policy.AccentFlags = 0
+            policy.GradientColor = gradient_color
+            policy.AnimationId = 0
+
+            data = WindowCompositionAttributeData()
+            data.Attribute = WCA_ACCENT_POLICY
+            data.Data = ctypes.pointer(policy)
+            data.SizeOfData = ctypes.sizeof(policy)
+
+            handle = ctypes.windll.user32.GetParent(self.winfo_id()) or self.winfo_id()
+            ok = ctypes.windll.user32.SetWindowCompositionAttribute(handle, ctypes.byref(data))
+            return bool(ok)
+        except Exception:
+            return False
 
     def apply_topmost(self):
         try:
@@ -1276,6 +1444,15 @@ class Widget(tk.Tk):
 
         content_width = self.px(300)
 
+        gradient = theme.get("gradient")
+        if gradient:
+            strip_height = self.px(3)
+            strip = tk.Canvas(self.shell, width=content_width, height=strip_height,
+                              highlightthickness=0, bd=0, bg=theme["card"])
+            strip.pack(fill="x", pady=(0, self.px(10)))
+            draw_horizontal_gradient(strip, content_width, strip_height, *gradient)
+            self.make_draggable(strip)
+
         # Шапка
         header = tk.Frame(self.shell, bg=theme["card"], width=content_width)
         header.pack(fill="x", pady=(0, self.px(12)))
@@ -1361,6 +1538,7 @@ class Widget(tk.Tk):
         for child in self.winfo_children():
             if child is not self.settings_window:
                 child.destroy()
+        self.apply_glass()
         self.build()
         self.update_idletasks()
         self.geometry("%dx%d+%d+%d" % (self.winfo_reqwidth(),
@@ -1585,9 +1763,9 @@ class Widget(tk.Tk):
                 if utilization is None and used is not None and limit:
                     utilization = float(used) / float(limit) * 100.0
                 percent = float(utilization or 0.0)
-                row.value_label.config(text="%.0f%%" % percent,
-                                       fg=row.color_for(percent))
-                row.bar.render(percent, row.color_for(percent))
+                color = row.color_for(percent)
+                row.value_label.config(text="%.0f%%" % percent, fg=color)
+                row.bar.render(percent, color, gradient=row.gradient_for(color))
                 if used is not None and limit:
                     row.sub_label.config(text="Использовано %s из %s."
                                               % (fmt_number(used), fmt_number(limit)))
