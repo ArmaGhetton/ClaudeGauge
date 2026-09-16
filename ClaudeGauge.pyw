@@ -43,7 +43,7 @@ except ImportError:
 
 APP_NAME = "ClaudeGauge"
 APP_TITLE = "ClaudeGauge"
-APP_VERSION = "1.1"
+APP_VERSION = "1.2"
 
 # Под этими именами виджет жил раньше: из них переносятся настройки
 # и удаляются устаревшие записи автозапуска.
@@ -61,13 +61,157 @@ BETA_HEADER = "oauth-2025-04-20"
 MIN_REFRESH_SECONDS = 120
 DEFAULT_REFRESH_SECONDS = 180
 
-RU_MONTHS = ["янв", "фев", "мар", "апр", "мая", "июн",
-             "июл", "авг", "сен", "окт", "ноя", "дек"]
+# --------------------------------------------------------------------------
+#  Локализация
+# --------------------------------------------------------------------------
 
-RU_MONTHS_FULL = ["января", "февраля", "марта", "апреля", "мая", "июня",
-                  "июля", "августа", "сентября", "октября", "ноября", "декабря"]
+# Текущий язык интерфейса. Синхронизируется с settings["language"] при
+# старте (Widget.__init__) и при переключении в настройках (on_language).
+LANG = "ru"
 
-RU_WEEKDAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
+MONTHS = {
+    "ru": ["янв", "фев", "мар", "апр", "мая", "июн",
+           "июл", "авг", "сен", "окт", "ноя", "дек"],
+    "en": ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+}
+
+MONTHS_FULL = {
+    "ru": ["января", "февраля", "марта", "апреля", "мая", "июня",
+           "июля", "августа", "сентября", "октября", "ноября", "декабря"],
+    "en": ["January", "February", "March", "April", "May", "June",
+           "July", "August", "September", "October", "November", "December"],
+}
+
+WEEKDAYS = {
+    "ru": ["пн", "вт", "ср", "чт", "пт", "сб", "вс"],
+    "en": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+}
+
+# Все переводимые тексты интерфейса. Ключ — смысловое имя, значение —
+# словарь {"ru": ..., "en": ...}. t() возвращает строку для текущего LANG
+# и при наличии именованных аргументов подставляет их через .format().
+STRINGS = {
+    "status_starting": {"ru": "Запуск…", "en": "Starting…"},
+    "status_updating": {"ru": "Обновляю…", "en": "Updating…"},
+    "status_updated": {"ru": "Обновлено в {time}.", "en": "Updated at {time}."},
+    "status_update_failed": {"ru": "Сбой обновления.", "en": "Update failed."},
+    "status_shortcut_created": {"ru": "Ярлык создан на рабочем столе.",
+                                "en": "Shortcut created on the desktop."},
+
+    "err_token_refresh_http": {"ru": "Не удалось обновить токен ({code}).",
+                               "en": "Failed to refresh the token ({code})."},
+    "hint_login": {"ru": "Запусти Claude Code и выполни /login.",
+                   "en": "Run Claude Code and execute /login."},
+    "err_timeout_refresh": {"ru": "Сервер не отвечает.", "en": "Server is not responding."},
+    "hint_timeout_refresh": {"ru": "Не дождались ответа при обновлении токена.",
+                             "en": "Timed out while refreshing the token."},
+    "err_token_refresh_other": {"ru": "Нет связи при обновлении токена.",
+                                "en": "No connection while refreshing the token."},
+    "err_token_missing": {"ru": "Сервер не вернул новый токен.",
+                          "en": "Server did not return a new token."},
+    "err_no_login": {"ru": "Не найден вход в Claude.", "en": "Not logged in to Claude."},
+    "hint_no_login": {"ru": "Установи Claude Code и выполни /login, либо вставь токен в настройках.",
+                      "en": "Install Claude Code and run /login, or paste a token in settings."},
+    "err_token_expired": {"ru": "Токен доступа устарел.", "en": "Access token expired."},
+    "hint_token_expired": {"ru": "Запусти Claude Code — он обновит токен сам.",
+                           "en": "Run Claude Code — it will refresh the token itself."},
+    "err_token_rejected": {"ru": "Токен отклонён.", "en": "Token rejected."},
+    "hint_token_rejected": {"ru": "Обновляю доступ…", "en": "Refreshing access…"},
+    "err_rate_limited": {"ru": "Слишком частые запросы.", "en": "Too many requests."},
+    "hint_rate_limited": {"ru": "Увеличь интервал обновления в настройках.",
+                          "en": "Increase the refresh interval in settings."},
+    "err_server": {"ru": "Ошибка сервера {code}.", "en": "Server error {code}."},
+    "err_no_connection": {"ru": "Нет соединения.", "en": "No connection."},
+    "err_timeout_fetch": {"ru": "Сервер не отвечает.", "en": "Server is not responding."},
+    "hint_timeout_fetch": {"ru": "Не дождались ответа, попробую снова позже.",
+                           "en": "Timed out, will try again later."},
+    "err_fetch_other": {"ru": "Не удалось получить данные.", "en": "Failed to fetch data."},
+
+    "err_shortcut_windows_only": {"ru": "Ярлык создаётся только в Windows.",
+                                  "en": "Shortcuts can only be created on Windows."},
+    "err_shortcut_missing_file": {"ru": "Не найден файл ClaudeGauge.pyw.",
+                                  "en": "ClaudeGauge.pyw file not found."},
+    "hint_shortcut_missing_file": {"ru": "Он должен лежать рядом с запущенным виджетом.",
+                                   "en": "It must be next to the running widget."},
+    "err_shortcut_prepare": {"ru": "Не удалось подготовить ярлык.",
+                             "en": "Failed to prepare the shortcut."},
+    "err_shortcut_create": {"ru": "Не удалось создать ярлык.", "en": "Failed to create the shortcut."},
+    "err_shortcut_powershell": {"ru": "PowerShell не смог создать ярлык.",
+                                "en": "PowerShell failed to create the shortcut."},
+    "hint_shortcut_log": {"ru": "Подробности в error.log.", "en": "Details in error.log."},
+
+    "row_waiting": {"ru": "Ожидание данных…", "en": "Waiting for data…"},
+    "row_no_active_window": {"ru": "Нет активного окна.", "en": "No active window."},
+    "row_reset_prefix": {"ru": "Сброс", "en": "Reset"},
+    "row_reset_template": {"ru": "{prefix} через {delta} · {date}.",
+                           "en": "{prefix} in {delta} · {date}."},
+    "row_title_session": {"ru": "Сессия · 5 часов", "en": "Session · 5 hours"},
+    "row_title_week_all": {"ru": "Неделя · Все модели", "en": "Week · All models"},
+    "row_title_week_sonnet": {"ru": "Неделя · Sonnet", "en": "Week · Sonnet"},
+    "row_title_week_opus": {"ru": "Неделя · Opus", "en": "Week · Opus"},
+    "row_title_extra": {"ru": "Дополнительный расход", "en": "Extra usage"},
+    "limit_not_active": {"ru": "Лимит пока не задействован.", "en": "Limit not active yet."},
+    "extra_off": {"ru": "Выкл.", "en": "Off"},
+    "extra_not_enabled": {"ru": "Дополнительный расход не подключён.",
+                          "en": "Extra usage is not enabled."},
+    "extra_used_of": {"ru": "Использовано {used} из {limit}.", "en": "Used {used} of {limit}."},
+    "extra_enabled": {"ru": "Включён.", "en": "Enabled."},
+
+    "today_at": {"ru": "Сегодня в {time}", "en": "Today at {time}"},
+    "tomorrow_at": {"ru": "Завтра в {time}", "en": "Tomorrow at {time}"},
+    "date_full_month": {"ru": "{day} {month} · {time}", "en": "{month} {day} · {time}"},
+    "date_short": {"ru": "{day} {month}, {weekday}, {time}", "en": "{month} {day}, {weekday}, {time}"},
+    "just_now": {"ru": "вот-вот", "en": "any moment"},
+
+    "menu_refresh": {"ru": "Обновить сейчас", "en": "Refresh now"},
+    "menu_settings": {"ru": "Настройки…", "en": "Settings…"},
+    "menu_create_shortcut": {"ru": "Создать ярлык на рабочем столе", "en": "Create desktop shortcut"},
+    "menu_always_on_top": {"ru": "Поверх всех окон", "en": "Always on top"},
+    "menu_compact": {"ru": "Компактный режим", "en": "Compact mode"},
+    "menu_quit": {"ru": "Выход", "en": "Exit"},
+
+    "settings_title": {"ru": "Настройки · ClaudeGauge", "en": "Settings · ClaudeGauge"},
+    "section_appearance": {"ru": "Внешний вид", "en": "Appearance"},
+    "section_data": {"ru": "Данные", "en": "Data"},
+    "section_system": {"ru": "Система", "en": "System"},
+    "label_language": {"ru": "Язык", "en": "Language"},
+    "label_opacity": {"ru": "Прозрачность", "en": "Opacity"},
+    "label_scale": {"ru": "Размер виджета", "en": "Widget size"},
+    "label_theme": {"ru": "Тема", "en": "Theme"},
+    "theme_dark": {"ru": "Тёмная", "en": "Dark"},
+    "theme_oled": {"ru": "OLED", "en": "OLED"},
+    "theme_light": {"ru": "Светлая", "en": "Light"},
+    "theme_aurora": {"ru": "Аврора", "en": "Aurora"},
+    "theme_sunset": {"ru": "Закат", "en": "Sunset"},
+    "label_accent": {"ru": "Акцент", "en": "Accent"},
+    "chk_stay_above_fullscreen": {"ru": "Поверх полноэкранных приложений",
+                                  "en": "Stay above fullscreen apps"},
+    "chk_hide_taskbar": {"ru": "Скрывать с панели задач", "en": "Hide from taskbar"},
+    "chk_glass": {"ru": "Эффект стекла (блюр Windows)", "en": "Glass effect (Windows blur)"},
+    "chk_locked": {"ru": "Закрепить позицию (не перетаскивается)",
+                   "en": "Lock position (disable dragging)"},
+    "chk_show_model_limits": {"ru": "Показывать недельные лимиты Sonnet и Opus",
+                              "en": "Show weekly Sonnet and Opus limits"},
+    "chk_show_extra_usage": {"ru": "Показывать дополнительный расход", "en": "Show extra usage"},
+    "label_interval": {"ru": "Интервал, сек", "en": "Interval, sec"},
+    "hint_interval_min": {"ru": "Минимум 120 — иначе сервер ответит 429.",
+                          "en": "Minimum 120 — otherwise the server responds 429."},
+    "label_threshold": {"ru": "Порог тревоги, %", "en": "Warning threshold, %"},
+    "chk_sound_on_warn": {"ru": "Звуковой сигнал при достижении порога", "en": "Sound alert at threshold"},
+    "chk_autostart": {"ru": "Запускать при входе в Windows", "en": "Launch at Windows sign-in"},
+    "chk_auto_refresh_token": {"ru": "Обновлять токен доступа самостоятельно",
+                               "en": "Refresh access token automatically"},
+    "label_manual_token": {"ru": "Свой токен (необязательно)", "en": "Custom token (optional)"},
+    "hint_manual_token": {"ru": "Оставь пустым — токен возьмётся из Claude Code автоматически.",
+                          "en": "Leave empty — the token will be taken from Claude Code automatically."},
+    "btn_done": {"ru": "Готово", "en": "Done"},
+}
+
+
+def t(key, **kwargs):
+    text = STRINGS[key][LANG]
+    return text.format(**kwargs) if kwargs else text
 
 
 THEMES = {
@@ -183,6 +327,7 @@ DEFAULT_SETTINGS = {
     "x": None,
     "y": None,
     "locked": False,
+    "language": "ru",
 }
 
 
@@ -293,18 +438,26 @@ def plural(number, one, few, many):
 def human_delta(seconds):
     seconds = int(seconds)
     if seconds <= 0:
-        return "вот-вот"
+        return t("just_now")
     days, rest = divmod(seconds, 86400)
     hours, rest = divmod(rest, 3600)
     minutes, secs = divmod(rest, 60)
+    if LANG == "ru":
+        if days:
+            return "%d %s %d %s" % (days, plural(days, "день", "дня", "дней"),
+                                    hours, plural(hours, "час", "часа", "часов"))
+        if hours:
+            return "%d ч %02d мин" % (hours, minutes)
+        if minutes:
+            return "%d мин %02d сек" % (minutes, secs)
+        return "%d сек" % secs
     if days:
-        return "%d %s %d %s" % (days, plural(days, "день", "дня", "дней"),
-                                hours, plural(hours, "час", "часа", "часов"))
+        return "%dd %dh" % (days, hours)
     if hours:
-        return "%d ч %02d мин" % (hours, minutes)
+        return "%dh %02dm" % (hours, minutes)
     if minutes:
-        return "%d мин %02d сек" % (minutes, secs)
-    return "%d сек" % secs
+        return "%dm %02ds" % (minutes, secs)
+    return "%ds" % secs
 
 
 def clock(dt):
@@ -314,14 +467,15 @@ def clock(dt):
 def date_and_clock(dt, full_month=False):
     now = datetime.now(dt.tzinfo)
     if dt.date() == now.date():
-        return "Сегодня в %s" % clock(dt)
+        return t("today_at", time=clock(dt))
     delta_days = (dt.date() - now.date()).days
     if delta_days == 1:
-        return "Завтра в %s" % clock(dt)
+        return t("tomorrow_at", time=clock(dt))
     if full_month:
-        return "%d %s · %s" % (dt.day, RU_MONTHS_FULL[dt.month - 1], clock(dt))
-    return "%d %s, %s, %s" % (dt.day, RU_MONTHS[dt.month - 1],
-                              RU_WEEKDAYS[dt.weekday()], clock(dt))
+        return t("date_full_month", day=dt.day, month=MONTHS_FULL[LANG][dt.month - 1],
+                 time=clock(dt))
+    return t("date_short", day=dt.day, month=MONTHS[LANG][dt.month - 1],
+             weekday=WEEKDAYS[LANG][dt.weekday()], time=clock(dt))
 
 
 # --------------------------------------------------------------------------
@@ -329,12 +483,17 @@ def date_and_clock(dt, full_month=False):
 # --------------------------------------------------------------------------
 
 class UsageError(Exception):
-    """Ошибка с уже готовым русским текстом для показа в виджете."""
+    """Ошибка с уже готовым (переведённым) текстом для показа в виджете.
 
-    def __init__(self, message, hint=""):
+    kind — машинный признак для логики (например, "token_rejected"), чтобы
+    код мог распознать причину ошибки без сравнения переведённого текста.
+    """
+
+    def __init__(self, message, hint="", kind=None):
         super().__init__(message)
         self.message = message
         self.hint = hint
+        self.kind = kind
 
 
 def credentials_candidates():
@@ -444,15 +603,14 @@ def refresh_access_token(refresh_token):
         with urllib.request.urlopen(request, timeout=20) as response:
             data = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        raise UsageError("Не удалось обновить токен (%d)." % exc.code,
-                         "Запусти Claude Code и выполни /login.")
+        raise UsageError(t("err_token_refresh_http", code=exc.code), t("hint_login"))
+    except TimeoutError:
+        raise UsageError(t("err_timeout_refresh"), t("hint_timeout_refresh"))
     except Exception as exc:
-        raise UsageError("Нет связи при обновлении токена.",
-                         str(exc)[:80])
+        raise UsageError(t("err_token_refresh_other"), str(exc)[:80])
     access = data.get("access_token")
     if not access:
-        raise UsageError("Сервер не вернул новый токен.",
-                         "Запусти Claude Code и выполни /login.")
+        raise UsageError(t("err_token_missing"), t("hint_login"))
     return {
         "accessToken": access,
         "refreshToken": data.get("refresh_token") or refresh_token,
@@ -493,10 +651,7 @@ class TokenProvider:
         if block is None:
             if env_token:
                 return env_token
-            raise UsageError(
-                "Не найден вход в Claude.",
-                "Установи Claude Code и выполни /login, либо вставь токен в настройках.",
-            )
+            raise UsageError(t("err_no_login"), t("hint_no_login"))
 
         needs_refresh = force_refresh or token_expired(block)
         if needs_refresh and self.settings.get("auto_refresh_token", True):
@@ -514,10 +669,7 @@ class TokenProvider:
         if needs_refresh and not self.settings.get("auto_refresh_token", True):
             if env_token:
                 return env_token
-            raise UsageError(
-                "Токен доступа устарел.",
-                "Запусти Claude Code — он обновит токен сам.",
-            )
+            raise UsageError(t("err_token_expired"), t("hint_token_expired"))
 
         return block["accessToken"]
 
@@ -544,15 +696,17 @@ def fetch_usage(token):
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         if exc.code == 401:
-            raise UsageError("Токен отклонён.", "Обновляю доступ…")
+            raise UsageError(t("err_token_rejected"), t("hint_token_rejected"),
+                             kind="token_rejected")
         if exc.code == 429:
-            raise UsageError("Слишком частые запросы.",
-                             "Увеличь интервал обновления в настройках.")
-        raise UsageError("Ошибка сервера %d." % exc.code, "")
+            raise UsageError(t("err_rate_limited"), t("hint_rate_limited"))
+        raise UsageError(t("err_server", code=exc.code), "")
     except urllib.error.URLError as exc:
-        raise UsageError("Нет соединения.", str(getattr(exc, "reason", ""))[:60])
+        raise UsageError(t("err_no_connection"), str(getattr(exc, "reason", ""))[:60])
+    except TimeoutError:
+        raise UsageError(t("err_timeout_fetch"), t("hint_timeout_fetch"))
     except Exception as exc:
-        raise UsageError("Не удалось получить данные.", str(exc)[:60])
+        raise UsageError(t("err_fetch_other"), str(exc)[:60])
 
 
 # --------------------------------------------------------------------------
@@ -607,12 +761,12 @@ class ProgressBar(tk.Canvas):
 class UsageRow:
     """Одна строка: заголовок, проценты, полоса, подпись о сбросе."""
 
-    def __init__(self, parent, app, title, width):
+    def __init__(self, parent, app, title, width, weekly=False):
         self.app = app
         theme = app.theme
         self.reset_at = None
         self.percent = 0.0
-        self.weekly = title.startswith("Неделя")
+        self.weekly = weekly
 
         self.frame = tk.Frame(parent, bg=theme["card"])
         self.frame.pack(fill="x", pady=(0, app.px(11)))
@@ -633,8 +787,8 @@ class UsageRow:
         self.bar = ProgressBar(self.frame, width, app.px(7), theme)
         self.bar.pack(fill="x", pady=(app.px(5), app.px(4)))
 
-        self.prefix = "Сброс"
-        self.sub_label = tk.Label(self.frame, text="Ожидание данных…",
+        self.prefix = t("row_reset_prefix")
+        self.sub_label = tk.Label(self.frame, text=t("row_waiting"),
                                   bg=theme["card"], fg=theme["muted"],
                                   font=app.font_tiny, anchor="w")
         self.sub_label.pack(fill="x")
@@ -657,15 +811,15 @@ class UsageRow:
             return None
         return self.app.theme.get("gradient")
 
-    def update(self, percent, reset_at, prefix="Сброс"):
+    def update(self, percent, reset_at, prefix=None):
         self.percent = float(percent or 0.0)
         self.reset_at = reset_at
-        self.prefix = prefix
+        self.prefix = prefix if prefix is not None else t("row_reset_prefix")
         color = self.color_for(self.percent)
         self.value_label.config(text="%.0f%%" % self.percent, fg=color)
         self.bar.render(self.percent, color, gradient=self.gradient_for(color))
         if reset_at is None:
-            self.sub_label.config(text="Нет активного окна.")
+            self.sub_label.config(text=t("row_no_active_window"))
         else:
             self.tick()
 
@@ -678,8 +832,8 @@ class UsageRow:
             return
         left = (self.reset_at - datetime.now(self.reset_at.tzinfo)).total_seconds()
         self.sub_label.config(
-            text="%s через %s · %s." % (self.prefix, human_delta(left),
-                                       date_and_clock(self.reset_at, full_month=self.weekly))
+            text=t("row_reset_template", prefix=self.prefix, delta=human_delta(left),
+                  date=date_and_clock(self.reset_at, full_month=self.weekly))
         )
 
 
@@ -697,7 +851,7 @@ class SettingsWindow(tk.Toplevel):
         self._theme_cards = {}
         self._accent_dots = []
         self._drag = (0, 0)
-        self.title("Настройки · ClaudeGauge")
+        self.title(t("settings_title"))
         self.overrideredirect(True)
         self.configure(bg=app.theme["bg"])
         self.resizable(False, False)
@@ -751,10 +905,24 @@ class SettingsWindow(tk.Toplevel):
             return var
 
         # --- Внешний вид ---
-        section("Внешний вид")
+        section(t("section_appearance"))
 
         frame = row()
-        tk.Label(frame, text="Прозрачность", bg=theme["bg"], fg=theme["muted"],
+        tk.Label(frame, text=t("label_language"), bg=theme["bg"], fg=theme["muted"],
+                 font=label_font, width=16, anchor="w").pack(side="left")
+        self.lang_var = tk.StringVar(value=self.settings.get("language", "ru"))
+        self._lang_labels = {}
+        # Названия языков не переводятся — каждое показывается на себе самом.
+        for code, caption in (("ru", "Русский"), ("en", "English")):
+            lbl = tk.Label(frame, text=caption, bg=theme["bg"], font=label_font,
+                          cursor="hand2", padx=8)
+            lbl.pack(side="left")
+            lbl.bind("<Button-1>", lambda _e, c=code: self.on_language(c))
+            self._lang_labels[code] = lbl
+        self._paint_lang_labels()
+
+        frame = row()
+        tk.Label(frame, text=t("label_opacity"), bg=theme["bg"], fg=theme["muted"],
                  font=label_font, width=16, anchor="w").pack(side="left")
         self.opacity_value = tk.Label(frame, text="", bg=theme["bg"],
                                       fg=theme["text"], font=label_font, width=5)
@@ -763,13 +931,16 @@ class SettingsWindow(tk.Toplevel):
                                 showvalue=False, bg=self.settings["accent"], fg=theme["text"],
                                 troughcolor=theme["card"], highlightthickness=0,
                                 bd=0, sliderrelief="flat",
-                                activebackground=self.settings["accent"],
-                                command=self.on_opacity)
+                                activebackground=self.settings["accent"])
+        # set() сам вызывает command — присваиваем его только после того, как
+        # выставили стартовое значение, иначе одно только открытие настроек
+        # заново применяет прозрачность/пересобирает окно виджета.
         self.opacity.set(self.settings["opacity"])
+        self.opacity.config(command=self.on_opacity)
         self.opacity.pack(side="left", fill="x", expand=True)
 
         frame = row()
-        tk.Label(frame, text="Размер виджета", bg=theme["bg"], fg=theme["muted"],
+        tk.Label(frame, text=t("label_scale"), bg=theme["bg"], fg=theme["muted"],
                  font=label_font, width=16, anchor="w").pack(side="left")
         self.scale_value = tk.Label(frame, text="", bg=theme["bg"],
                                     fg=theme["text"], font=label_font, width=5)
@@ -778,44 +949,43 @@ class SettingsWindow(tk.Toplevel):
                               showvalue=False, bg=self.settings["accent"], fg=theme["text"],
                               troughcolor=theme["card"], highlightthickness=0,
                               bd=0, sliderrelief="flat",
-                              activebackground=self.settings["accent"],
-                              command=self.on_scale)
+                              activebackground=self.settings["accent"])
         self.scale.set(self.settings["scale"])
+        self.scale.config(command=self.on_scale)
         self.scale.pack(side="left", fill="x", expand=True)
 
         frame = row()
-        tk.Label(frame, text="Тема", bg=theme["bg"], fg=theme["muted"],
+        tk.Label(frame, text=t("label_theme"), bg=theme["bg"], fg=theme["muted"],
                  font=label_font, width=16, anchor="n").pack(side="left", anchor="n")
         self.theme_var = tk.StringVar(value=self.settings["theme"])
-        for value, caption in (("dark", "Тёмная"), ("oled", "OLED"), ("light", "Светлая"),
-                               ("aurora", "Аврора"), ("sunset", "Закат")):
+        for value, caption in (("dark", t("theme_dark")), ("oled", t("theme_oled")),
+                               ("light", t("theme_light")), ("aurora", t("theme_aurora")),
+                               ("sunset", t("theme_sunset"))):
             self._build_theme_card(frame, value, caption).pack(side="left", padx=(0, 10))
 
         frame = row()
-        tk.Label(frame, text="Акцент", bg=theme["bg"], fg=theme["muted"],
+        tk.Label(frame, text=t("label_accent"), bg=theme["bg"], fg=theme["muted"],
                  font=label_font, width=16, anchor="n").pack(side="left", anchor="n")
         for color in ACCENTS.values():
             self._build_accent_dot(frame, color).pack(side="left")
 
-        check(row(), "Поверх всех окон", "always_on_top", self.app.apply_topmost)
-        check(row(), "Поверх полноэкранных приложений", "stay_above_fullscreen",
+        check(row(), t("menu_always_on_top"), "always_on_top", self.app.apply_topmost)
+        check(row(), t("chk_stay_above_fullscreen"), "stay_above_fullscreen",
               self.app.apply_window_styles)
-        check(row(), "Скрывать с панели задач", "hide_from_taskbar",
+        check(row(), t("chk_hide_taskbar"), "hide_from_taskbar",
               self.app.apply_window_styles)
-        check(row(), "Компактный режим", "compact", self.app.rebuild)
-        check(row(), "Эффект стекла (блюр Windows)", "glass", self.app.rebuild)
-        check(row(), "Закрепить позицию (не перетаскивается)", "locked")
+        check(row(), t("menu_compact"), "compact", self.app.rebuild)
+        check(row(), t("chk_glass"), "glass", self.app.rebuild)
+        check(row(), t("chk_locked"), "locked")
 
         # --- Данные ---
-        section("Данные")
+        section(t("section_data"))
 
-        check(row(), "Показывать недельные лимиты Sonnet и Opus",
-              "show_model_limits", self.app.rebuild)
-        check(row(), "Показывать дополнительный расход", "show_extra_usage",
-              self.app.rebuild)
+        check(row(), t("chk_show_model_limits"), "show_model_limits", self.app.rebuild)
+        check(row(), t("chk_show_extra_usage"), "show_extra_usage", self.app.rebuild)
 
         frame = row()
-        tk.Label(frame, text="Интервал, сек", bg=theme["bg"], fg=theme["muted"],
+        tk.Label(frame, text=t("label_interval"), bg=theme["bg"], fg=theme["muted"],
                  font=label_font, width=16, anchor="w").pack(side="left")
         self.interval = tk.Spinbox(frame, from_=MIN_REFRESH_SECONDS, to=3600,
                                    increment=30, width=8, font=label_font,
@@ -829,12 +999,12 @@ class SettingsWindow(tk.Toplevel):
         self.interval.bind("<FocusOut>", lambda _e: self.on_interval())
         self.interval.bind("<Return>", lambda _e: self.on_interval())
         self.interval.pack(side="left")
-        tk.Label(frame, text="Минимум 120 — иначе сервер ответит 429.",
+        tk.Label(frame, text=t("hint_interval_min"),
                  bg=theme["bg"], fg=theme["muted"],
                  font=("Segoe UI", 8)).pack(side="left", padx=(8, 0))
 
         frame = row()
-        tk.Label(frame, text="Порог тревоги, %", bg=theme["bg"], fg=theme["muted"],
+        tk.Label(frame, text=t("label_threshold"), bg=theme["bg"], fg=theme["muted"],
                  font=label_font, width=16, anchor="w").pack(side="left")
         self.threshold_value = tk.Label(frame, text="", bg=theme["bg"],
                                         fg=theme["text"], font=label_font, width=5)
@@ -843,21 +1013,21 @@ class SettingsWindow(tk.Toplevel):
                                   showvalue=False, bg=self.settings["accent"], fg=theme["text"],
                                   troughcolor=theme["card"], highlightthickness=0,
                                   bd=0, sliderrelief="flat",
-                                  activebackground=self.settings["accent"],
-                                  command=self.on_threshold)
+                                  activebackground=self.settings["accent"])
         self.threshold.set(self.settings["warn_threshold"])
+        self.threshold.config(command=self.on_threshold)
         self.threshold.pack(side="left", fill="x", expand=True)
 
-        check(row(), "Звуковой сигнал при достижении порога", "sound_on_warn")
+        check(row(), t("chk_sound_on_warn"), "sound_on_warn")
 
         # --- Система ---
-        section("Система")
+        section(t("section_system"))
 
-        check(row(), "Запускать при входе в Windows", "autostart", self.on_autostart)
-        check(row(), "Обновлять токен доступа самостоятельно", "auto_refresh_token")
+        check(row(), t("chk_autostart"), "autostart", self.on_autostart)
+        check(row(), t("chk_auto_refresh_token"), "auto_refresh_token")
 
         frame = row()
-        tk.Label(frame, text="Свой токен (необязательно)", bg=theme["bg"],
+        tk.Label(frame, text=t("label_manual_token"), bg=theme["bg"],
                  fg=theme["muted"], font=label_font, anchor="w").pack(fill="x")
         self.token_entry = tk.Entry(content, show="•", font=("Consolas", 9),
                                     bg=theme["card"], fg=theme["text"],
@@ -867,7 +1037,7 @@ class SettingsWindow(tk.Toplevel):
                                     highlightcolor=self.settings["accent"], bd=0)
         self.token_entry.insert(0, self.settings.get("manual_token", ""))
         self.token_entry.pack(fill="x", ipady=4, pady=(2, 0))
-        tk.Label(content, text="Оставь пустым — токен возьмётся из Claude Code автоматически.",
+        tk.Label(content, text=t("hint_manual_token"),
                  bg=theme["bg"], fg=theme["muted"], font=("Segoe UI", 8),
                  anchor="w").pack(fill="x", pady=(2, 0))
 
@@ -875,13 +1045,13 @@ class SettingsWindow(tk.Toplevel):
         buttons = tk.Frame(content, bg=theme["bg"])
         buttons.pack(fill="x", pady=(16, 0))
 
-        tk.Button(buttons, text="Обновить сейчас", command=self.app.request_refresh,
+        tk.Button(buttons, text=t("menu_refresh"), command=self.app.request_refresh,
                   bg=theme["card"], fg=theme["text"], font=label_font,
                   relief="flat", bd=0, padx=12, pady=6, cursor="hand2",
                   activebackground=theme["hover"],
                   activeforeground=theme["text"]).pack(side="left")
 
-        tk.Button(buttons, text="Готово", command=self.close,
+        tk.Button(buttons, text=t("btn_done"), command=self.close,
                   bg=self.settings["accent"], fg="#FFFFFF", font=label_font,
                   relief="flat", bd=0, padx=18, pady=6, cursor="hand2",
                   activebackground=self.settings["accent"],
@@ -995,6 +1165,31 @@ class SettingsWindow(tk.Toplevel):
         for canvas, color in self._accent_dots:
             self._paint_accent_dot(canvas, color)
 
+    def _paint_lang_labels(self):
+        theme = self._chrome_theme
+        selected_font = ("Segoe UI Semibold", 9)
+        normal_font = ("Segoe UI", 9)
+        for code, lbl in self._lang_labels.items():
+            selected = self.lang_var.get() == code
+            lbl.config(fg=self.settings["accent"] if selected else theme["muted"],
+                      font=selected_font if selected else normal_font)
+
+    def on_language(self, code):
+        global LANG
+        if code == self.settings.get("language", "ru"):
+            return
+        self.lang_var.set(code)
+        self.settings["language"] = code
+        # Не потерять ещё не сохранённый вручную введённый токен —
+        # окно настроек будет пересоздано целиком.
+        self.settings["manual_token"] = self.token_entry.get().strip()
+        save_settings(self.settings)
+        LANG = code
+        self.app.settings_window = None
+        self.destroy()
+        self.app.rebuild()
+        self.app.open_settings()
+
     def update_labels(self):
         self.opacity_value.config(text="%d%%" % int(self.opacity.get()))
         self.scale_value.config(text="%d%%" % int(self.scale.get()))
@@ -1090,12 +1285,11 @@ def create_desktop_shortcut():
     а не через командную строку — иначе кириллица в пути искажается.
     """
     if sys.platform != "win32":
-        raise UsageError("Ярлык создаётся только в Windows.", "")
+        raise UsageError(t("err_shortcut_windows_only"), "")
 
     target = os.path.join(script_dir(), "ClaudeGauge.pyw")
     if not os.path.isfile(target):
-        raise UsageError("Не найден файл ClaudeGauge.pyw.",
-                         "Он должен лежать рядом с запущенным виджетом.")
+        raise UsageError(t("err_shortcut_missing_file"), t("hint_shortcut_missing_file"))
 
     def quote(value):
         return "'" + str(value).replace("'", "''") + "'"
@@ -1118,7 +1312,7 @@ def create_desktop_shortcut():
         with open(path, "w", encoding="utf-8-sig") as fh:
             fh.write(script)
     except OSError as exc:
-        raise UsageError("Не удалось подготовить ярлык.", str(exc)[:60])
+        raise UsageError(t("err_shortcut_prepare"), str(exc)[:60])
 
     try:
         result = subprocess.run(
@@ -1127,13 +1321,12 @@ def create_desktop_shortcut():
             creationflags=0x08000000,  # CREATE_NO_WINDOW
         )
     except Exception as exc:
-        raise UsageError("Не удалось создать ярлык.", str(exc)[:60])
+        raise UsageError(t("err_shortcut_create"), str(exc)[:60])
 
     if result.returncode != 0:
         details = (result.stderr or b"").decode("utf-8", "replace").strip()
         log_error("Ярлык: %s" % details)
-        raise UsageError("PowerShell не смог создать ярлык.",
-                         "Подробности в error.log.")
+        raise UsageError(t("err_shortcut_powershell"), t("hint_shortcut_log"))
 
 
 def set_autostart(enabled):
@@ -1173,11 +1366,13 @@ def set_autostart(enabled):
 class Widget(tk.Tk):
     def __init__(self):
         super().__init__()
+        global LANG
         self.settings = load_settings()
+        LANG = self.settings.get("language", "ru")
         self.token_provider = TokenProvider(self.settings)
         self.settings_window = None
         self.data = None
-        self.status_text = "Запуск…"
+        self.status_text = t("status_starting")
         self.status_hint = ""
         self.plan = ""
         self.last_update = None
@@ -1275,6 +1470,7 @@ class Widget(tk.Tk):
             self.attributes("-alpha", self.settings.get("opacity", 94) / 100.0)
         except tk.TclError:
             pass
+        self.sync_taskbar_style()
 
     def apply_glass(self):
         """Эффект стекла: -transparentcolor делает "card" дырой в окне,
@@ -1351,19 +1547,18 @@ class Widget(tk.Tk):
             self.attributes("-topmost", bool(self.settings.get("always_on_top", True)))
         except tk.TclError:
             pass
+        self.sync_taskbar_style()
 
-    def apply_icon(self, window=None):
-        """Ставит иконку главному окну или окну настроек."""
-        if not os.path.isfile(ICON_PATH):
-            return
-        target = window if window is not None else self
-        try:
-            target.iconbitmap(ICON_PATH)
-        except tk.TclError:
-            pass
+    def sync_taskbar_style(self):
+        """Восстанавливает биты TOOLWINDOW/APPWINDOW/NOACTIVATE в GWL_EXSTYLE.
 
-    def apply_window_styles(self):
-        """Расширенные стили окна: запись в панели задач и перехват фокуса."""
+        Tk на Windows при каждой обработке "wm attributes" (-alpha,
+        -topmost — см. apply_opacity/apply_topmost) пересобирает весь
+        GWL_EXSTYLE окна по своим внутренним данным и стирает то, что
+        выставлено вручную через SetWindowLongW. Без повторного вызова
+        после каждого такого attributes галочка "Скрывать с панели задач"
+        переставала действовать уже после первого обновления данных
+        (force_repaint вызывает apply_opacity)."""
         if sys.platform != "win32":
             return
         try:
@@ -1379,16 +1574,38 @@ class Widget(tk.Tk):
                 style = (style & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW
             else:
                 style = (style & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW
-            # Без этого флага возврат наверх будет отбирать фокус у игры.
             if self.settings.get("stay_above_fullscreen"):
                 style |= WS_EX_NOACTIVATE
             else:
                 style &= ~WS_EX_NOACTIVATE
-            self.withdraw()
             user32.SetWindowLongW(handle, GWL_EXSTYLE, style)
-            self.deiconify()
+        except Exception:
+            pass
+
+    def apply_icon(self, window=None):
+        """Ставит иконку главному окну или окну настроек."""
+        if not os.path.isfile(ICON_PATH):
+            return
+        target = window if window is not None else self
+        try:
+            target.iconbitmap(ICON_PATH)
+        except tk.TclError:
+            pass
+
+    def apply_window_styles(self):
+        """Расширенные стили окна: запись в панели задач и перехват фокуса.
+
+        withdraw()/deiconify() здесь обязательны: без пересоздания окна на
+        экране Windows не обновит существующую кнопку в панели задач при
+        одной лишь смене GWL_EXSTYLE."""
+        if sys.platform != "win32":
+            return
+        try:
+            self.withdraw()
             self.apply_opacity()
             self.apply_topmost()
+            self.sync_taskbar_style()
+            self.deiconify()
             self.apply_rounded_corners()
         except Exception as exc:
             log_error("Стили окна: %s" % exc)
@@ -1492,14 +1709,19 @@ class Widget(tk.Tk):
         self.body = body
 
         self.rows = {}
-        self.rows["five_hour"] = UsageRow(body, self, "Сессия · 5 часов", content_width)
-        self.rows["seven_day"] = UsageRow(body, self, "Неделя · Все модели", content_width)
+        self.rows["five_hour"] = UsageRow(body, self, t("row_title_session"), content_width,
+                                          weekly=False)
+        self.rows["seven_day"] = UsageRow(body, self, t("row_title_week_all"), content_width,
+                                          weekly=True)
 
         if not self.settings.get("compact") and self.settings.get("show_model_limits"):
-            self.rows["seven_day_sonnet"] = UsageRow(body, self, "Неделя · Sonnet", content_width)
-            self.rows["seven_day_opus"] = UsageRow(body, self, "Неделя · Opus", content_width)
+            self.rows["seven_day_sonnet"] = UsageRow(body, self, t("row_title_week_sonnet"),
+                                                      content_width, weekly=True)
+            self.rows["seven_day_opus"] = UsageRow(body, self, t("row_title_week_opus"),
+                                                    content_width, weekly=True)
         if not self.settings.get("compact") and self.settings.get("show_extra_usage"):
-            self.rows["extra_usage"] = UsageRow(body, self, "Дополнительный расход", content_width)
+            self.rows["extra_usage"] = UsageRow(body, self, t("row_title_extra"), content_width,
+                                                weekly=False)
 
         # Подвал
         footer = tk.Frame(self.shell, bg=theme["card"], width=content_width)
@@ -1523,15 +1745,14 @@ class Widget(tk.Tk):
                             activebackground=self.settings["accent"],
                             activeforeground="#FFFFFF", bd=0,
                             font=("Segoe UI", 9))
-        self.menu.add_command(label="Обновить сейчас", command=self.request_refresh)
-        self.menu.add_command(label="Настройки…", command=self.open_settings)
-        self.menu.add_command(label="Создать ярлык на рабочем столе",
-                              command=self.make_shortcut)
+        self.menu.add_command(label=t("menu_refresh"), command=self.request_refresh)
+        self.menu.add_command(label=t("menu_settings"), command=self.open_settings)
+        self.menu.add_command(label=t("menu_create_shortcut"), command=self.make_shortcut)
         self.menu.add_separator()
-        self.menu.add_command(label="Поверх всех окон", command=self.toggle_topmost)
-        self.menu.add_command(label="Компактный режим", command=self.toggle_compact)
+        self.menu.add_command(label=t("menu_always_on_top"), command=self.toggle_topmost)
+        self.menu.add_command(label=t("menu_compact"), command=self.toggle_compact)
         self.menu.add_separator()
-        self.menu.add_command(label="Выход", command=self.quit_app)
+        self.menu.add_command(label=t("menu_quit"), command=self.quit_app)
 
     def rebuild(self):
         x, y = self.winfo_x(), self.winfo_y()
@@ -1576,9 +1797,9 @@ class Widget(tk.Tk):
             self.set_status(exc.message, exc.hint)
         except Exception as exc:
             log_error(traceback.format_exc())
-            self.set_status("Не удалось создать ярлык.", str(exc)[:60])
+            self.set_status(t("err_shortcut_create"), str(exc)[:60])
         else:
-            self.set_status("Ярлык создан на рабочем столе.", "")
+            self.set_status(t("status_shortcut_created"), "")
 
     def quit_app(self):
         self.settings["x"] = self.winfo_x()
@@ -1592,7 +1813,7 @@ class Widget(tk.Tk):
         if self.busy:
             return
         self.busy = True
-        self.set_status("Обновляю…", "")
+        self.set_status(t("status_updating"), "")
         threading.Thread(target=self.worker, daemon=True).start()
 
     def worker(self):
@@ -1601,7 +1822,7 @@ class Widget(tk.Tk):
             try:
                 payload = fetch_usage(token)
             except UsageError as exc:
-                if exc.message.startswith("Токен отклонён"):
+                if exc.kind == "token_rejected":
                     token = self.token_provider.get_token(force_refresh=True)
                     payload = fetch_usage(token)
                 else:
@@ -1612,7 +1833,7 @@ class Widget(tk.Tk):
             self.results.put(("error", exc.message, exc.hint))
         except Exception as exc:
             log_error(traceback.format_exc())
-            self.results.put(("error", "Сбой обновления.", str(exc)[:60]))
+            self.results.put(("error", t("status_update_failed"), str(exc)[:60]))
 
     def poll_results(self):
         """Крутится в главном потоке — только он имеет право трогать интерфейс."""
@@ -1634,7 +1855,7 @@ class Widget(tk.Tk):
         if plan:
             self.plan = plan
             self.plan_label.config(text=plan)
-        self.set_status("Обновлено в %s." % self.last_update.strftime("%H:%M:%S"), "")
+        self.set_status(t("status_updated", time=self.last_update.strftime("%H:%M:%S")), "")
         self.redraw_data()
         self.schedule_next()
 
@@ -1675,29 +1896,6 @@ class Widget(tk.Tk):
         self.force_repaint()
 
     def force_repaint(self):
-        """Затирает освободившуюся область окна.
-
-        Виджет полупрозрачный, а такие окна Windows рисует слоем и после
-        уменьшения высоты оставляет на экране прежний текст. Очищаем сами.
-        """
-        if sys.platform != "win32":
-            return
-        try:
-            import ctypes
-            user32 = ctypes.windll.user32
-            handle = user32.GetParent(self.winfo_id()) or self.winfo_id()
-            RDW_INVALIDATE = 0x0001
-            RDW_ERASE = 0x0004
-            RDW_ALLCHILDREN = 0x0080
-            RDW_UPDATENOW = 0x0100
-            user32.RedrawWindow(handle, None, None,
-                                RDW_INVALIDATE | RDW_ERASE
-                                | RDW_ALLCHILDREN | RDW_UPDATENOW)
-        except Exception:
-            pass
-        self.force_repaint()
-
-    def force_repaint(self):
         """Стирает остатки старого текста.
 
         Окно полупрозрачное, поэтому Windows рисует его через отдельный буфер
@@ -1735,7 +1933,7 @@ class Widget(tk.Tk):
             if not isinstance(block, dict):
                 row.update(0, None)
                 row.value_label.config(text="—", fg=self.theme["muted"])
-                row.sub_label.config(text="Лимит пока не задействован.")
+                row.sub_label.config(text=t("limit_not_active"))
                 row.bar.render(0, self.settings["accent"])
                 continue
             percent = float(block.get("utilization") or 0.0)
@@ -1754,7 +1952,7 @@ class Widget(tk.Tk):
         if row is not None:
             extra = self.data.get("extra_usage") or {}
             if not extra.get("is_enabled"):
-                row.update_text("Выкл.", "Дополнительный расход не подключён.")
+                row.update_text(t("extra_off"), t("extra_not_enabled"))
                 row.bar.render(0, self.settings["accent"])
             else:
                 used = extra.get("used_credits")
@@ -1767,10 +1965,10 @@ class Widget(tk.Tk):
                 row.value_label.config(text="%.0f%%" % percent, fg=color)
                 row.bar.render(percent, color, gradient=row.gradient_for(color))
                 if used is not None and limit:
-                    row.sub_label.config(text="Использовано %s из %s."
-                                              % (fmt_number(used), fmt_number(limit)))
+                    row.sub_label.config(text=t("extra_used_of", used=fmt_number(used),
+                                               limit=fmt_number(limit)))
                 else:
-                    row.sub_label.config(text="Включён.")
+                    row.sub_label.config(text=t("extra_enabled"))
                 row.reset_at = None
 
         self.plan_label.config(fg=self.settings["accent"])
@@ -1787,9 +1985,9 @@ def fmt_number(value):
         number = float(value)
     except (TypeError, ValueError):
         return str(value)
-    if number == int(number):
-        return "{:,}".format(int(number)).replace(",", " ")
-    return "{:,.2f}".format(number).replace(",", " ")
+    text = "{:,}".format(int(number)) if number == int(number) else "{:,.2f}".format(number)
+    # По-русски разряды разделяются пробелом, по-английски — обычная запятая.
+    return text if LANG == "en" else text.replace(",", " ")
 
 
 # --------------------------------------------------------------------------
